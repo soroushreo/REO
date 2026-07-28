@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>REO CLASSIC - FULL GAME</title>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<style>
+@font-face {
+  font-family: 'IRANSans';
+  src: url('https://cdn.jsdelivr.net/gh/rastikerdar/iransans-font@v5.0.0/dist/IRANSansWeb.woff2') format('woff2');
+  font-weight: normal; font-style: normal;
+}
+
+:root {
+  --bg-dark: #07120e;
+  --panel-bg: rgba(14, 35, 27, 0.95);
+  --border-gold: #d4af37;
+  --accent-gold: linear-gradient(135deg, #f3d078, #c59b27);
+  --green-felt: radial-gradient(circle, #1a5c43 0%, #0d3828 70%, #061c14 100%);
+  --card-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+* { box-sizing: border-box; font-family: 'IRANSans', Tahoma, sans-serif; user-select: none; }
+body { margin: 0; background: var(--bg-dark); color: #f0f7f4; background-image: radial-gradient(#153125 1px, transparent 1px); background-size: 24px 24px; }
+.app { max-width: 1280px; margin: auto; padding: 12px; }
+
+/* صفحه لابی */
+.lobby-screen {
+  max-width: 500px; margin: 30px auto; background: var(--panel-bg);
+  border: 2px solid var(--border-gold); border-radius: 20px; padding: 24px;
+  box-shadow: 0 15px 35px rgba(0,0,0,0.7); text-align: center;
+}
+.lobby-title {
+  font-size: 28px; font-weight: 900;
+  background: linear-gradient(135deg, #fff, #f3d078, #d4af37);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 20px;
+}
+.input-group { margin-bottom: 15px; text-align: right; }
+.input-group label { display: block; font-size: 12px; color: #ffd700; margin-bottom: 5px; }
+.input-control {
+  width: 100%; padding: 10px 14px; background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.2); border-radius: 10px; color: #fff; font-size: 14px; outline: none;
+}
+.room-list {
+  max-height: 180px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px; padding: 8px; margin-top: 10px; background: rgba(0,0,0,0.2);
+}
+.room-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 12px; background: rgba(255,255,255,0.05); border-radius: 8px; margin-bottom: 6px;
+}
+.btn-full { width: 100%; margin-top: 10px; }
+.hidden { display: none !important; }
+
+/* محیط بازی */
+.brand-box {
+  background: var(--panel-bg); border: 1px solid rgba(212, 175, 55, 0.35);
+  border-radius: 16px; padding: 10px 18px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+.top, .controls {
+  background: var(--panel-bg); border: 1px solid rgba(212, 175, 55, 0.25);
+  border-radius: 16px; padding: 10px 18px; display: flex; gap: 10px; align-items: center;
+  justify-content: center; flex-wrap: wrap; box-shadow: 0 10px 30px rgba(0,0,0,0.5); margin-top: 10px;
+}
+.controls { margin-top: 14px; padding: 12px 20px; justify-content: flex-start; }
+h1 { margin: 0; font-size: 26px; font-weight: 900; background: linear-gradient(135deg, #fff, #f3d078, #d4af37); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: 2px; }
+
+.pill { background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.12); padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; color: #e2f1e9; }
+.status { flex: 1; min-width: 250px; font-size: 14px; font-weight: 600; color: #ffd700; }
+
+.btn { border: 0; border-radius: 10px; padding: 9px 20px; background: var(--accent-gold); color: #0d1e16; font-weight: bold; cursor: pointer; transition: all 0.2s ease; }
+.btn:hover:not(:disabled) { transform: translateY(-2px); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn.secondary { background: rgba(255, 255, 255, 0.1); color: #fff; border: 1px solid rgba(255, 255, 255, 0.2); }
+
+.table { position: relative; height: 600px; margin-top: 12px; border: 12px solid #0a2218; border-radius: 36px; background: var(--green-felt); box-shadow: inset 0 0 80px rgba(0,0,0,0.8); overflow: hidden; }
+.player { position: absolute; z-index: 30; background: rgba(7, 24, 17, 0.92); border: 1.5px solid rgba(212, 175, 55, 0.4); border-radius: 14px; padding: 8px 12px; min-width: 150px; text-align: center; }
+.player.active { border-color: #ffd700; box-shadow: 0 0 20px rgba(255, 215, 0, 0.7); background: rgba(15, 45, 32, 0.95); }
+
+.p0 { bottom: 10px; left: 50%; transform: translateX(-50%); } 
+.p1 { right: 10px; top: 50%; transform: translateY(-50%); } 
+.p2 { top: 10px; left: 50%; transform: translateX(-50%); } 
+.p3 { left: 10px; top: 50%; transform: translateY(-50%); } 
+
+.hand { position: absolute; z-index: 105; bottom: 65px; left: 50%; transform: translateX(-50%); width: min(92%, 800px); height: 110px; display: flex; align-items: flex-end; justify-content: center; direction: ltr; }
+.card { width: 72px; height: 102px; background: #fff; border-radius: 8px; box-shadow: var(--card-shadow); position: relative; cursor: pointer; transition: transform 0.18s ease; }
+.real-card { background: linear-gradient(135deg, #ffffff 0%, #f4f2ec 100%); border: 1px solid #c8c3b8; color: #1a1a1a; }
+.card.disabled { opacity: 0.4; cursor: not-allowed; }
+
+.card-corner { position: absolute; top: 4px; left: 6px; font-size: 13px; font-weight: 800; line-height: 1; }
+.card-center { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 34px; }
+.red { color: #d62828; }
+
+.hand .card { margin-left: -30px; }
+.hand .card:hover:not(.disabled) { transform: translateY(-20px) scale(1.08); z-index: 110; }
+
+.trick-area { position: absolute; z-index: 50; left: 50%; top: 48%; width: 320px; height: 240px; transform: translate(-50%, -50%); pointer-events: none; }
+.played { position: absolute; width: 72px; height: 102px; }
+.played.p0 { bottom: 10px; left: 50%; transform: translateX(-50%); }
+.played.p1 { right: 15px; top: 50%; transform: translateY(-50%); }
+.played.p2 { top: 10px; left: 50%; transform: translateX(-50%); }
+.played.p3 { left: 15px; top: 50%; transform: translateY(-50%); }
+
+.decree-modal { position: absolute; inset: 0; background: rgba(0,0,0,0.85); z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 15px; }
+.decree-btn { font-size: 24px; padding: 12px 25px; border-radius: 12px; border: 1px solid var(--border-gold); background: rgba(255,255,255,0.1); color: #fff; cursor: pointer; }
+.decree-btn:hover { background: var(--border-gold); color: #000; }
+
+@media(max-width: 768px) {
+  .table { height: 500px; }
+  .hand { bottom: 40px; }
+  .hand .card { width: 42px; height: 62px; margin-left: -20px; }
+  .card-center { font-size: 22px; }
+}
+</style>
+</head>
+<body>
+
+<!-- LOBBY -->
+<div class="lobby-screen" id="lobbyScreen">
+  <div class="lobby-title">REO CLASSIC</div>
+  
+  <div class="input-group">
+    <label>نام بازیکن:</label>
+    <input type="text" class="input-control" id="playerNameInput" value="سروش">
+  </div>
+
+  <div style="display:flex; gap:10px; margin-bottom: 15px;">
+    <button class="btn btn-full" id="btnStartOffline">🎮 شروع بازی تک‌نفره (آفلاین)</button>
+    <button class="btn btn-full secondary" id="btnModeOnline">🌐 لابی آنلاین (Render)</button>
+  </div>
+
+  <div id="onlineSection" class="hidden">
+    <hr style="border-color: rgba(255,255,255,0.1); margin: 15px 0;">
+    <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+      <span style="font-size:13px; color:#ffd700; font-weight:bold;">اتاق‌های سرور:</span>
+    </div>
+    <div class="room-list" id="roomList">
+      <div style="font-size:12px; color:#aaa; padding:10px;">در حال اتصال به Render...</div>
+    </div>
+    <button class="btn btn-full" id="btnShowCreateRoom" style="margin-top:15px;">➕ ساخت اتاق جدید</button>
+  </div>
+
+  <div id="createRoomForm" class="hidden" style="margin-top: 15px; background: rgba(0,0,0,0.2); padding: 12px; border-radius:10px;">
+    <div class="input-group">
+      <label>نام اتاق:</label>
+      <input type="text" class="input-control" id="roomNameInput" placeholder="نام اتاق...">
+    </div>
+    <button class="btn btn-full" id="btnCreateRoomSubmit">تایید و ساخت</button>
+  </div>
+</div>
+
+<!-- GAME APP -->
+<div class="app hidden" id="gameApp">
+  <div class="brand-box"><h1>REO CLASSIC</h1></div>
+
+  <div class="top">
+    <span class="pill" id="decree">📜 حکم: —</span>
+    <span class="pill" id="cycle">👑 حاکم: ---</span>
+    <span class="pill" id="score">⭐ تیم ما: ۰ | تیم مقابل: ۰</span>
+  </div>
+
+  <div class="table">
+    <div class="player p0" id="pl0"><b>شما</b><div class="meta" id="m0">دست‌ها: ۰</div></div>
+    <div class="player p1" id="pl1"><b>ربات ۱</b><div class="meta" id="m1">دست‌ها: ۰</div></div>
+    <div class="player p2" id="pl2"><b>یار شما</b><div class="meta" id="m2">دست‌ها: ۰</div></div>
+    <div class="player p3" id="pl3"><b>ربات ۲</b><div class="meta" id="m3">دست‌ها: ۰</div></div>
+    
+    <div class="trick-area" id="trickArea"></div>
+    <div class="hand" id="hand"></div>
+
+    <!-- مدال انتخاب حکم -->
+    <div class="decree-modal hidden" id="decreeModal">
+      <h3 style="color:#ffd700; margin:0;">شما حاکم هستید! حکم را انتخاب کنید:</h3>
+      <div style="display:flex; gap:15px;">
+        <button class="decree-btn" onclick="selectDecree('♠')">♠ حکم خال حکم</button>
+        <button class="decree-btn" onclick="selectDecree('♥')" style="color:#d62828;">♥ خشت</button>
+        <button class="decree-btn" onclick="selectDecree('♦')" style="color:#d62828;">♦ دل</button>
+        <button class="decree-btn" onclick="selectDecree('♣')">♣ گشنیز</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="status" id="status">بازی آماده است.</div>
+    <button class="btn secondary" onclick="location.reload()">خروج</button>
+  </div>
+</div>
+
+<script>
+const RENDER_SERVER_URL = "https://reo-tl5x.onrender.com";
+const SUITS = ['♠', '♥', '♦', '♣'];
+const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+const RANK_VALUES = {'2':2, '3':3, '4':4, '5':5, '6':6, '7':7, '8':8, '9':9, '10':10, 'J':11, 'Q':12, 'K':13, 'A':14};
+
+let deck = [], hands = [[],[],[],[]], currentTrick = [], turn = 0, ruler = 0, trump = null;
+let teamTricks = [0, 0], teamScores = [0, 0], leadSuit = null;
+
+const $=id=>document.getElementById(id);
+
+function initDeck() {
+  deck = [];
+  for (let s of SUITS) {
+    for (let r of RANKS) {
+      deck.push({ suit: s, rank: r, value: RANK_VALUES[r] });
+    }
+  }
+  deck.sort(() => Math.random() - 0.5);
+}
+
+// شروع بازی آفلاین
+$('btnStartOffline').onclick = () => {
+  $('lobbyScreen').classList.add('hidden');
+  $('gameApp').classList.remove('hidden');
+  startNewRound();
+};
+
+function startNewRound() {
+  initDeck();
+  hands = [[],[],[],[]];
+  currentTrick = [];
+  teamTricks = [0, 0];
+  trump = null;
+  
+  // پخش ۵ کارت اول
+  for (let i = 0; i < 4; i++) hands[i] = deck.splice(0, 5);
+  
+  updateUI();
+  ruler = 0; // بازیکن اول حاکم است
+  $('cycle').textContent = `👑 حاکم: شما`;
+
+  if (ruler === 0) {
+    $('decreeModal').classList.remove('hidden');
+  }
+}
+
+function selectDecree(suit) {
+  trump = suit;
+  $('decreeModal').classList.add('hidden');
+  $('decree').textContent = `📜 حکم: ${trump}`;
+  
+  // پخش بقیه کارت‌ها
+  for (let i = 0; i < 4; i++) hands[i].push(...deck.splice(0, 8));
+  
+  turn = ruler;
+  renderHand();
+  $('status').textContent = "کارت‌ها پخش شدند. نوبت شماست!";
+  highlightActivePlayer();
+}
+
+function renderHand() {
+  const handDiv = $('hand');
+  handDiv.innerHTML = '';
+  
+  hands[0].sort((a,b) => (a.suit === b.suit ? b.value - a.value : a.suit.localeCompare(b.suit)));
+  
+  hands[0].forEach((card, index) => {
+    let cardEl = document.createElement('div');
+    let isRed = card.suit === '♥' || card.suit === '♦';
+    cardEl.className = `card real-card ${isRed ? 'red' : ''}`;
+    cardEl.innerHTML = `
+      <div class="card-corner">${card.rank}<span>${card.suit}</span></div>
+      <div class="card-center">${card.suit}</div>
+    `;
+    cardEl.onclick = () => playCard(0, index);
+    handDiv.appendChild(cardEl);
+  });
+}
+
+function playCard(playerIdx, cardIdx) {
+  if (turn !== playerIdx) return;
+  
+  let card = hands[playerIdx][cardIdx];
+  if (currentTrick.length === 0) leadSuit = card.suit;
+
+  hands[playerIdx].splice(cardIdx, 1);
+  currentTrick.push({ player: playerIdx, card });
+  
+  renderPlayedCard(playerIdx, card);
+  if (playerIdx === 0) renderHand();
+
+  if (currentTrick.length === 4) {
+    setTimeout(resolveTrick, 1200);
+  } else {
+    turn = (turn + 1) % 4;
+    highlightActivePlayer();
+    if (turn !== 0) setTimeout(botPlay, 800);
+  }
+}
+
+function botPlay() {
+  let botHand = hands[turn];
+  let playIndex = 0;
+  
+  // هوش مصنوعی ساده: کارت اول معتبر را بازی کند
+  if (leadSuit) {
+    let validIndex = botHand.findIndex(c => c.suit === leadSuit);
+    if (validIndex !== -1) playIndex = validIndex;
+  }
+  playCard(turn, playIndex);
+}
+
+function renderPlayedCard(playerIdx, card) {
+  let isRed = card.suit === '♥' || card.suit === '♦';
+  let el = document.createElement('div');
+  el.className = `card real-card played p${playerIdx} ${isRed ? 'red' : ''}`;
+  el.innerHTML = `
+    <div class="card-corner">${card.rank}<span>${card.suit}</span></div>
+    <div class="card-center">${card.suit}</div>
+  `;
+  $('trickArea').appendChild(el);
+}
+
+function resolveTrick() {
+  let winnerObj = currentTrick[0];
+  
+  for (let i = 1; i < currentTrick.length; i++) {
+    let curr = currentTrick[i];
+    let winCard = winnerObj.card;
+    let currCard = curr.card;
+
+    if (currCard.suit === trump && winCard.suit !== trump) {
+      winnerObj = curr;
+    } else if (currCard.suit === winCard.suit && currCard.value > winCard.value) {
+      winnerObj = curr;
+    }
+  }
+
+  let winnerTeam = (winnerObj.player % 2 === 0) ? 0 : 1;
+  teamTricks[winnerTeam]++;
+  
+  $('trickArea').innerHTML = '';
+  currentTrick = [];
+  leadSuit = null;
+  turn = winnerObj.player;
+  
+  $('m0').textContent = `دست‌ها: ${teamTricks[0]}`;
+  $('m2').textContent = `دست‌ها: ${teamTricks[0]}`;
+  $('m1').textContent = `دست‌ها: ${teamTricks[1]}`;
+  $('m3').textContent = `دست‌ها: ${teamTricks[1]}`;
+
+  if (teamTricks[winnerTeam] >= 7) {
+    alert(winnerTeam === 0 ? "🎉 شما این دور را بردید!" : "❌ تیم مقابل این دور را برد!");
+    startNewRound();
+  } else {
+    highlightActivePlayer();
+    if (turn !== 0) setTimeout(botPlay, 600);
+  }
+}
+
+function highlightActivePlayer() {
+  for (let i = 0; i < 4; i++) {
+    $(`pl${i}`).classList.toggle('active', turn === i);
+  }
+  $('status').textContent = turn === 0 ? "نوبت شماست!" : `نوبت ${$(`pl${turn}`).querySelector('b').textContent} است...`;
+}
+
+function updateUI() {
+  $('m0').textContent = `دست‌ها: ۰`; $('m1').textContent = `دست‌ها: ۰`;
+  $('m2').textContent = `دست‌ها: ۰`; $('m3').textContent = `دست‌ها: ۰`;
+}
+
+// اتصال لابی به Render
+let socket = null;
+$('btnModeOnline').onclick = () => {
+  $('onlineSection').classList.remove('hidden');
+  if (!socket) {
+    socket = io(RENDER_SERVER_URL);
+    socket.on('updateRoomList', (rooms) => {
+      let box = $('roomList');
+      box.innerHTML = rooms.length ? '' : '<div style="font-size:12px; color:#aaa; padding:10px;">هیچ اتاقی ساخته نشده است.</div>';
+      rooms.forEach(r => {
+        box.innerHTML += `<div class="room-item"><div><b>${r.name}</b> (${r.playerCount}/۴)</div><button class="btn secondary" style="padding:3px 8px; font-size:11px;">ورود</button></div>`;
+      });
+    });
+  }
+};
+$('btnShowCreateRoom').onclick = () => $('createRoomForm').classList.remove('hidden');
+</script>
+</body>
+</html>
